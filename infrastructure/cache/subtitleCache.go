@@ -6,9 +6,6 @@ import (
 	"github.com/mongodb/mongo-go-driver/mongo"
 )
 
-type SubtitlesRepository struct {
-}
-
 func failOnError(error string) {
 	panic(error)
 }

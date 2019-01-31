@@ -5,25 +5,25 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	gourl "net/url"
 	domain "subtitles/domain"
 )
 
 func failOnError(err error) {
 	if err != nil {
-		log.Fatalf("Failed : %s error:\n[%v]\n", err)
+		log.Fatalf("Failed: error:\n[%v]\n", err)
 	}
 }
 
 type omDBSearchResultDTO struct {
-	search []struct {
-		title    string `json:"Title"`
-		year     string `json:"Year"`
-		imdbID   string `json:"imdbID"`
-		showType string `json:"Type"`
-		poster   string `json:"Poster"`
+	Search []struct {
+		Title    string `json:"Title"`
+		Year     string `json:"Year"`
+		ImdbID   string `json:"imdbID"`
+		ShowType string `json:"Type"`
 	} `json:"Search"`
-	totalResults string `json:"totalResults"`
-	response     string `json:"Response"`
+	TotalResults string `json:"totalResults"`
+	Response     string `json:"Response"`
 }
 
 type SubRepositoryImp struct {
@@ -36,21 +36,30 @@ func NewSubRepositoryImp() *SubRepositoryImp {
 	return &lRet
 }
 
-func (a *SubRepositoryImp) find(episode domain.Episode) (domain.Subtitle, error) {
-	url := "http://www.omdbapi.com/?s=%s&apikey=e6fe729a"
-	resp, err := a.client.Get(fmt.Sprintf(url, episode.ShowName))
-	failOnError(err)
+func (a *SubRepositoryImp) Find(episode domain.Episode) (domain.Subtitle, error) {
+	url, error := gourl.Parse("http://www.omdbapi.com")
+	failOnError(error)
+	params := gourl.Values{}
+	params.Add("apikey", "e6fe729a")
+	params.Add("s", episode.ShowName)
+	url.RawQuery = params.Encode()
+	urlStr := url.String()
+	resp, error := a.client.Get(url.String())
+	failOnError(error)
 	defer resp.Body.Close()
 	res := omDBSearchResultDTO{}
-	err = json.NewDecoder(resp.Body).Decode(&res)
-	failOnError(err)
+	error = json.NewDecoder(resp.Body).Decode(&res)
+	failOnError(error)
 	resp.Body.Close()
-	url = "https://rest.opensubtitles.org/search/episode-%d/imdbid-%d/season-%d/sublanguageid-en"
-	url = fmt.Sprintf(url, episode.Number, res.search[0].imdbID, episode.Season)
-	resp, err = a.client.Get(url)
+	urlStr = "https://rest.opensubtitles.org/search/episode-%d/imdbid-%s/season-%d/sublanguageid-en"
+	imdbId := res.Search[0].ImdbID
+	urlStr = fmt.Sprintf(urlStr, episode.Number, imdbId, episode.Season)
+	url, error = gourl.Parse(urlStr)
+	failOnError(error)
+	resp, error = a.client.Get(url.String())
 	resOS := openSubtitleResultDTO{}
-	err = json.NewDecoder(resp.Body).Decode(&resOS)
-	failOnError(err)
+	error = json.NewDecoder(resp.Body).Decode(&resOS)
+	failOnError(error)
 
 	subtitle := domain.Subtitle{}
 	subtitle.Id = resOS[0].IDSubtitle
